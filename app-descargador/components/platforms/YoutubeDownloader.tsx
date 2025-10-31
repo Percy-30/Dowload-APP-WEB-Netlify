@@ -94,79 +94,75 @@ export default function YoutubeDownloader() {
   }
 
   // Función mejorada para descargar a través del backend
-  const downloadThroughBackend = async (downloadUrl: string, filename: string, quality?: string) => {
-    try {
-      setDownloading(quality || 'audio')
-      
-      console.log('Iniciando descarga:', { downloadUrl, filename })
-      
-      // Usar el backend como proxy para descargar
-      const response = await fetch('/api/download/proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: downloadUrl,
-          filename: filename
-        })
+  // ✅ VERSIÓN SIMPLIFICADA - Más fácil de debuggear
+const downloadThroughBackend = async (downloadUrl: string, filename: string, quality?: string) => {
+  try {
+    setDownloading(quality || 'audio')
+    console.log('⬇️ Iniciando descarga...', { quality, filename })
+    
+    const response = await fetch('/api/download/proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: downloadUrl,
+        filename: filename
       })
+    })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`)
-      }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(errorData.error || `Error ${response.status}`)
+    }
 
-      // Obtener el blob de la respuesta
-      const blob = await response.blob()
-      
-      if (blob.size === 0) {
-        throw new Error('El archivo recibido está vacío')
-      }
-      
-      console.log('Blob recibido:', blob.size, 'bytes')
-      
-      // Crear URL local para descargar
-      const blobUrl = URL.createObjectURL(blob)
+    const blob = await response.blob()
+    
+    if (blob.size === 0) {
+      throw new Error('El archivo recibido está vacío')
+    }
+    
+    console.log('✅ Descarga exitosa:', blob.size, 'bytes')
+    
+    // Descargar archivo
+    const blobUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = filename
+    link.style.display = 'none'
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Liberar memoria
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+    
+  } catch (error) {
+    console.error('❌ Error en descarga:', error)
+    
+    // Fallback a descarga directa
+    console.log('🔄 Intentando descarga directa...')
+    try {
       const link = document.createElement('a')
-      link.href = blobUrl
+      link.href = downloadUrl
       link.download = filename
-      link.style.display = 'none'
-      
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
-      // Liberar memoria después de un tiempo
-      setTimeout(() => {
-        URL.revokeObjectURL(blobUrl)
-        console.log('URL revocada')
-      }, 1000)
-      
-    } catch (error) {
-      console.error('Error en descarga por proxy:', error)
-      
-      // Fallback: intentar descarga directa
-      console.log('Intentando descarga directa como fallback...')
-      try {
-        const link = document.createElement('a')
-        link.href = downloadUrl
-        link.download = filename
-        link.target = '_blank'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        
-        console.log('Descarga directa iniciada')
-      } catch (fallbackError) {
-        console.error('Error en descarga directa:', fallbackError)
-        throw new Error('No se pudo descargar el archivo. Error: ' + 
-          (error instanceof Error ? error.message : 'Desconocido'))
-      }
-    } finally {
-      setDownloading(null)
+      console.log('📥 Descarga directa iniciada')
+    } catch (fallbackError) {
+      console.error('❌ Error en descarga directa:', fallbackError)
+      throw new Error('No se pudo descargar el archivo')
     }
+  } finally {
+    // ✅ ESTO SIEMPRE SE EJECUTA - limpia el estado
+    setDownloading(null)
+    console.log('🧹 Estado de descarga limpiado')
   }
+}
 
   // Función para encontrar el formato más cercano a la calidad solicitada
   const findBestFormatForQuality = (quality: string): VideoFormat | null => {

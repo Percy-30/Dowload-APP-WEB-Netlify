@@ -1,6 +1,8 @@
 // app/api/download/tiktok/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
+export const maxDuration = 80; // Máximo 30 segundos para Vercel
+
 // Validación directa en el archivo (temporal)
 function isValidTiktokUrl(url: string): boolean {
   if (!url) return false
