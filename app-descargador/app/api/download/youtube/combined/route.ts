@@ -1,7 +1,8 @@
 // app/api/download/youtube/combined/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:8000'
+//const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:8000'
+const PYTHON_API_URL = (process.env.PYTHON_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 // ✅ FUNCIÓN PARA MAPEAR CALIDAD A ITAG
 const mapQualityToItag = (quality: string) => {
