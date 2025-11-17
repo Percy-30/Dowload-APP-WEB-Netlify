@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // URL de tu backend Python FastAPI
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000'
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:8000'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,15 +17,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!PYTHON_BACKEND_URL) {
-      console.error('❌ ERROR: PYTHON_BACKEND_URL no configurada')
+    if (!PYTHON_API_URL) {
+      console.error('❌ ERROR: PYTHON_API_URL no configurada')
       return NextResponse.json(
         { error: 'Backend no configurado' },
         { status: 500 }
       )
     }
 
-    const backendUrl = `${PYTHON_BACKEND_URL}/api/v1/facebook/info`
+    const backendUrl = `${PYTHON_API_URL}/api/v1/facebook/info`
 
     console.log('🚀 Llamando a backend Python:', backendUrl)
 
