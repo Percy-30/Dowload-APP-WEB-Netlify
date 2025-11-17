@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    PYTHON_BACKEND_URL: process.env.PYTHON_BACKEND_URL,
+    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+  },
   serverExternalPackages: ['yt-dlp-wrap'],
   async headers() {
     return [
