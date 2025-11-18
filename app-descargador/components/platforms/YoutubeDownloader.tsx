@@ -1,3 +1,4 @@
+//app/components/platforms/YoutubeDownloader.py
 'use client'
 
 import { useState } from 'react'
@@ -108,45 +109,152 @@ export default function YoutubeDownloader() {
     }
   }
 
-  // ✅ FUNCIÓN PARA DIAGNÓSTICO DE COMBINACIÓN
-  const diagnoseCombinationIssue = (quality: string) => {
-    const { format, hasAudio, hasRecommendedAudio } = findBestFormatForQuality(quality)
-    
-    console.log('🔍 DIAGNÓSTICO COMBINACIÓN:', {
-      calidad: quality,
-      formatoEncontrado: !!format,
-      urlFormato: format?.url?.substring(0, 100),
-      tieneAudio: hasAudio,
-      tieneAudioRecomendado: hasRecommendedAudio,
-      formatoCompleto: format
-    })
+  // ✅ FUNCIÓN PARA VERIFICAR SI LA COMBINACIÓN ESTÁ PERMITIDA (HASTA 1080p)
+  const isCombinationAllowed = (quality: string): boolean => {
+    // ✅ LIMITAR COMBINACIÓN HASTA 1080p (MENOS DE 200MB)
+    const allowedCombinationQualities = ['144p', '240p', '360p', '480p', '720p', '1080p']
+    return allowedCombinationQualities.includes(quality)
+  }
 
-    if (format?.recommended_audio) {
-      console.log('🎵 Audio recomendado disponible:', format.recommended_audio)
+  // ✅ FUNCIÓN MEJORADA PARA DESCARGA COMBINADA CON STREAMING
+  const downloadCombined = async (quality: string) => {
+    // ✅ VERIFICAR LÍMITE ANTES DE PROCESAR
+    if (!isCombinationAllowed(quality)) {
+      setError(`La combinación automática no está disponible para ${quality}. Descarga el video por separado.`)
+      return
     }
 
-    // Mostrar todos los formatos disponibles para debug
-    if (videoInfo?.formats) {
-      console.log('📋 TODOS LOS FORMATOS DISPONIBLES:')
-      videoInfo.formats.forEach((f, i) => {
-        if (f.url && f.url.startsWith('http')) {
-          console.log(`[${i}] ${f.quality} | ${f.resolution} | audio:${f.hasAudio} | video:${f.hasVideo} | url:${f.url?.substring(0, 80)}...`)
-          if (f.recommended_audio) {
-            console.log('   🔊 Audio recomendado:', f.recommended_audio)
-          }
-        }
+    try {
+      setDownloading(`combined-${quality}`)
+      setDownloadProgress(0)
+      
+      console.log('🎬 Iniciando descarga combinada con streaming...', quality)
+      
+      const downloadUrl = originalUrl
+      
+      if (!downloadUrl) {
+        throw new Error('No hay URL disponible para descargar. Por favor, busca el video nuevamente.')
+      }
+
+      console.log('🔗 URL para descarga combinada:', downloadUrl)
+
+      const response = await fetch('/api/download/youtube/combined', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: downloadUrl,
+          quality: quality,
+          format_type: 'mp4'
+        })
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error en descarga combinada')
+      }
+
+      const data = await response.json()
+      console.log('📦 Respuesta del backend combinado:', {
+        status: data.status,
+        method: data.method,
+        file_size: data.file_size,
+        has_file_content: !!data.file_content
+      })
+      
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval)
+            return 90
+          }
+          return prev + 10
+        })
+      }, 500)
+
+      // ✅ ESTRATEGIA MEJORADA PARA STREAMING
+      if (data.status === 'success') {
+        console.log('✅ Backend procesó exitosamente la combinación')
+        
+        // ESTRATEGIA 1: Contenido base64 desde streaming (PRINCIPAL)
+        if (data.file_content) {
+          console.log('🔧 Procesando archivo combinado base64 desde streaming')
+          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
+          await handleBase64Download(data.file_content, filename, quality)
+        }
+        
+        // ESTRATEGIA 2: URLs separadas (fallback)
+        else if (data.video_url && data.audio_url) {
+          console.log('🎵 Combinando con URLs separadas (fallback)')
+          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
+          await downloadCombinedWithProxy(data.video_url, data.audio_url, filename, quality)
+        }
+        
+        // ESTRATEGIA 3: URL directa (fallback)
+        else if (data.download_url && data.download_url.startsWith('http')) {
+          console.log('📥 Usando URL directa combinada (fallback)')
+          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
+          await downloadThroughBackend(data.download_url, filename, quality, false)
+        }
+        
+        else {
+          throw new Error('Backend no proporcionó datos válidos para la combinación')
+        }
+        
+      } else {
+        throw new Error(data.message || 'El backend no completó la combinación correctamente')
+      }
+      
+      clearInterval(progressInterval)
+      setDownloadProgress(100)
+      
+    } catch (error) {
+      console.error('❌ Error en descarga combinada:', error)
+      setError(error instanceof Error ? error.message : 'Error en descarga combinada')
+      
+      // ✅ FALLBACK MEJORADO
+      console.log('🔄 Intentando estrategias de fallback...')
+      
+      try {
+        // Estrategia de fallback: Descarga normal del formato disponible
+        const { format } = findBestFormatForQuality(quality)
+        if (format && format.url && format.url.startsWith('http')) {
+          console.log('🔄 Fallback: Descarga normal sin combinar')
+          const filename = `youtube_${quality}_${Date.now()}.mp4`
+          await downloadThroughBackend(format.url, filename, quality, false)
+          return
+        }
+        
+        throw new Error('No hay formatos disponibles para fallback')
+        
+      } catch (fallbackError) {
+        console.error('❌ Todos los fallbacks fallaron:', fallbackError)
+        setError('No se pudo completar la descarga. Por favor, intenta con una calidad diferente.')
+      }
+    } finally {
+      setDownloading(null)
+      setDownloadProgress(0)
     }
   }
 
-  // ✅ FUNCIÓN PARA MANEJAR DESCARGA BASE64
+  // ✅ FUNCIÓN PARA MANEJAR DESCARGA BASE64 (ACTUALIZADA)
   const handleBase64Download = async (base64Content: string, filename: string, quality: string) => {
     try {
-      console.log('🔧 Procesando archivo combinado base64...')
+      console.log('🔧 Procesando archivo combinado base64 desde streaming...')
+      
+      if (!base64Content) {
+        throw new Error('El contenido base64 está vacío')
+      }
       
       // Decodificar base64 a blob
-      const response = await fetch(`data:video/mp4;base64,${base64Content}`)
-      const blob = await response.blob()
+      const byteCharacters = atob(base64Content);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'video/mp4' });
       
       if (blob.size === 0) {
         throw new Error('El archivo base64 está vacío')
@@ -165,6 +273,7 @@ export default function YoutubeDownloader() {
       link.click()
       document.body.removeChild(link)
       
+      // Limpiar URL después de 5 segundos
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
       console.log('✅ Descarga base64 completada')
       
@@ -174,10 +283,10 @@ export default function YoutubeDownloader() {
     }
   }
 
-  // ✅ FUNCIÓN PARA COMBINACIÓN CON PROXY
+  // ✅ FUNCIÓN PARA COMBINACIÓN CON PROXY (FALLBACK)
   const downloadCombinedWithProxy = async (videoUrl: string, audioUrl: string, filename: string, quality: string) => {
     try {
-      console.log('🎵 Combinando con URLs separadas...', { videoUrl: videoUrl.substring(0, 100), audioUrl: audioUrl.substring(0, 100) })
+      console.log('🎵 Combinando con URLs separadas (proxy fallback)...')
       
       // Enviar ambas URLs al proxy para combinación
       const response = await fetch('/api/download/proxy', {
@@ -223,138 +332,6 @@ export default function YoutubeDownloader() {
     } catch (error) {
       console.error('❌ Error en combinación por proxy:', error)
       throw error
-    }
-  }
-
-  // ✅ DESCARGA COMBINADA CORREGIDA Y FUNCIONAL
-  const downloadCombined = async (quality: string) => {
-    try {
-      setDownloading(`combined-${quality}`)
-      setDownloadProgress(0)
-      
-      console.log('🎬 Iniciando descarga combinada...', quality)
-      
-      const downloadUrl = originalUrl
-      
-      if (!downloadUrl) {
-        throw new Error('No hay URL disponible para descargar. Por favor, busca el video nuevamente.')
-      }
-
-      console.log('🔗 URL para descarga combinada:', downloadUrl)
-
-      const response = await fetch('/api/download/youtube/combined', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: downloadUrl,
-          quality: quality,
-          format_type: 'mp4'
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error en descarga combinada')
-      }
-
-      const data = await response.json()
-      console.log('📦 Respuesta completa del backend combinado:', data)
-      
-      const progressInterval = setInterval(() => {
-        setDownloadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return 90
-          }
-          return prev + 10
-        })
-      }, 500)
-
-      // ✅ ESTRATEGIA MEJORADA: Manejar diferentes tipos de respuesta
-      if (data.status === 'success') {
-        console.log('✅ Backend procesó exitosamente la combinación')
-        
-        // ESTRATEGIA 1: URL directa del backend combinado
-        if (data.download_url && data.download_url.startsWith('http')) {
-          console.log('📥 Usando URL directa combinada:', data.download_url)
-          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
-          await downloadThroughBackend(data.download_url, filename, quality, false)
-        }
-        
-        // ESTRATEGIA 2: Contenido base64 (archivo ya combinado)
-        else if (data.file_content) {
-          console.log('🔧 Procesando archivo combinado base64')
-          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
-          await handleBase64Download(data.file_content, filename, quality)
-        }
-        
-        // ESTRATEGIA 3: URLs separadas (proxy las combina)
-        else if (data.video_url && data.audio_url) {
-          console.log('🎵 Combinando con URLs separadas')
-          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
-          await downloadCombinedWithProxy(data.video_url, data.audio_url, filename, quality)
-        }
-        
-        // ESTRATEGIA 4: Fallback - formato ya combinado
-        else if (data.format_url && data.format_url.startsWith('http')) {
-          console.log('🔗 Usando URL de formato combinado')
-          const filename = data.filename || `youtube_${quality}_${Date.now()}.mp4`
-          await downloadThroughBackend(data.format_url, filename, quality, false)
-        }
-        
-        else {
-          throw new Error('Backend no proporcionó datos válidos para la combinación')
-        }
-        
-      } else {
-        throw new Error(data.message || 'El backend no completó la combinación correctamente')
-      }
-      
-      clearInterval(progressInterval)
-      setDownloadProgress(100)
-      
-    } catch (error) {
-      console.error('❌ Error en descarga combinada:', error)
-      setError(error instanceof Error ? error.message : 'Error en descarga combinada')
-      
-      // ✅ FALLBACK MEJORADO: Intentar diferentes estrategias
-      console.log('🔄 Intentando estrategias de fallback...')
-      
-      try {
-        // Estrategia 1: Descarga normal del formato disponible
-        const { format } = findBestFormatForQuality(quality)
-        if (format && format.url && format.url.startsWith('http')) {
-          console.log('🔄 Fallback 1: Descarga normal')
-          const filename = `youtube_${quality}_${Date.now()}.mp4`
-          await downloadThroughBackend(format.url, filename, quality, false)
-          return
-        }
-        
-        // Estrategia 2: Descarga directa del video original
-        console.log('🔄 Fallback 2: Descarga directa')
-        const directUrl = originalUrl
-        const filename = `youtube_${quality}_${Date.now()}.mp4`
-        
-        // Crear enlace de descarga directa
-        const link = document.createElement('a')
-        link.href = directUrl
-        link.download = filename
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        console.log('📥 Descarga directa iniciada')
-        
-      } catch (fallbackError) {
-        console.error('❌ Todos los fallbacks fallaron:', fallbackError)
-        setError('No se pudo completar la descarga. Por favor, intenta con una calidad diferente.')
-      }
-    } finally {
-      setDownloading(null)
-      setDownloadProgress(0)
     }
   }
 
@@ -613,9 +590,6 @@ export default function YoutubeDownloader() {
   }
 
   const handleDownloadWithAd = (downloadFn: () => void, quality?: string) => {
-    if (quality) {
-      diagnoseCombinationIssue(quality); // ✅ EJECUTAR DIAGNÓSTICO ANTES DE DESCARGAR
-    }
     setPendingAction(() => downloadFn);
     setAdCountdown(5);
     setShowAd(true);
@@ -630,7 +604,8 @@ export default function YoutubeDownloader() {
     type: string, 
     size: string, 
     hasAudio: boolean,
-    canCombine: boolean 
+    canCombine: boolean,
+    combinationAllowed: boolean
   } => {
     const { format, hasAudio, hasRecommendedAudio } = findBestFormatForQuality(quality)
     
@@ -638,18 +613,23 @@ export default function YoutubeDownloader() {
       type: 'No disponible', 
       size: 'N/A', 
       hasAudio: false,
-      canCombine: false 
+      canCombine: false,
+      combinationAllowed: false
     }
     
     let typeText = 'Video'
     let canCombine = false
+    const combinationAllowed = isCombinationAllowed(quality)
     
     if (hasAudio) {
       typeText = 'Video + Audio'
       canCombine = false
-    } else if (hasRecommendedAudio) {
+    } else if (hasRecommendedAudio && combinationAllowed) {
       typeText = 'Video (audio separado)'
       canCombine = true
+    } else if (hasRecommendedAudio && !combinationAllowed) {
+      typeText = 'Video (audio separado)'
+      canCombine = false
     } else {
       typeText = 'Video (sin audio)'
       canCombine = false
@@ -659,7 +639,8 @@ export default function YoutubeDownloader() {
       type: typeText,
       size: format.size || 'N/A',
       hasAudio: hasAudio,
-      canCombine: canCombine
+      canCombine: canCombine,
+      combinationAllowed: combinationAllowed
     }
   }
 
@@ -1030,15 +1011,17 @@ export default function YoutubeDownloader() {
 
               {activeTab === 'combined' && (
                 <div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <div className="flex items-center space-x-2 text-blue-800">
+                  {/* ✅ NUEVO: MENSAJE DE LÍMITE DE COMBINACIÓN */}
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center space-x-2 text-yellow-800">
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                       </svg>
-                      <span className="font-semibold">Video con Audio Combinado</span>
+                      <span className="font-semibold">Límite de Combinación</span>
                     </div>
-                    <p className="text-blue-700 text-sm mt-2">
-                      Descarga el video con el audio incluido automáticamente. Ideal para la mayoría de usuarios.
+                    <p className="text-yellow-700 text-sm mt-2">
+                      La combinación automática está disponible solo hasta 1080p. Para 1440p y 4K, 
+                      descarga el video y audio por separado y combínalos localmente.
                     </p>
                   </div>
 
@@ -1069,8 +1052,11 @@ export default function YoutubeDownloader() {
                               <td className="border border-gray-300 px-4 py-3 text-gray-600">
                                 <div className="flex items-center">
                                   {formatInfo.type}
-                                  {formatInfo.canCombine && (
+                                  {formatInfo.canCombine && formatInfo.combinationAllowed && (
                                     <span className="ml-2 text-green-600" title="Audio será combinado">🔊</span>
+                                  )}
+                                  {formatInfo.canCombine && !formatInfo.combinationAllowed && (
+                                    <span className="ml-2 text-yellow-600" title="Combinación no disponible">⚠️</span>
                                   )}
                                 </div>
                               </td>
@@ -1085,20 +1071,26 @@ export default function YoutubeDownloader() {
                                 ) : (
                                   <button
                                     onClick={() => handleDownloadWithAd(() => downloadCombined(quality.value), quality.value)}
-                                    disabled={!isAvailable || !!downloading}
+                                    disabled={!isAvailable || !!downloading || !formatInfo.combinationAllowed}
                                     className={`py-2 px-4 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center w-full ${
-                                      isAvailable && !downloading
+                                      isAvailable && !downloading && formatInfo.combinationAllowed
                                         ? 'bg-green-600 hover:bg-green-700 text-white' 
                                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     }`}
                                   >
                                     {isAvailable ? (
-                                      <>
-                                        <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        Combinar y Descargar
-                                      </>
+                                      formatInfo.combinationAllowed ? (
+                                        <>
+                                          <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                          </svg>
+                                          Combinar y Descargar
+                                        </>
+                                      ) : (
+                                        <span className="text-xs">
+                                          ⚠️ Muy grande para combinar
+                                        </span>
+                                      )
                                     ) : (
                                       'No disponible'
                                     )}

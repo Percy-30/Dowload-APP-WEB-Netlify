@@ -1,21 +1,20 @@
 // app/api/download/youtube/combined/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-//const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:8000'
-const PYTHON_API_URL = (process.env.PYTHON_API_URL || 'http://localhost:8000').replace(/\/$/, '')
+const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000'
 
 // ✅ FUNCIÓN PARA MAPEAR CALIDAD A ITAG
 const mapQualityToItag = (quality: string) => {
   const qualityMap: { [key: string]: { video: number, audio: number } } = {
-    '2160p': { video: 401, audio: 140 },
-    '4k': { video: 401, audio: 140 },
-    '1440p': { video: 400, audio: 140 },
-    '1080p': { video: 137, audio: 140 },
-    '720p': { video: 136, audio: 140 },
-    '480p': { video: 135, audio: 140 },
-    '360p': { video: 134, audio: 140 },
+    '144p': { video: 160, audio: 140 },
     '240p': { video: 133, audio: 140 },
-    '144p': { video: 160, audio: 140 }
+    '360p': { video: 134, audio: 140 },
+    '480p': { video: 135, audio: 140 },
+    '720p': { video: 136, audio: 140 },
+    '1080p': { video: 137, audio: 140 },
+    '1440p': { video: 400, audio: 140 },
+    '2160p': { video: 401, audio: 140 },
+    '4k': { video: 401, audio: 140 }
   }
   
   return qualityMap[quality] || qualityMap['1080p'] // Default 1080p
@@ -27,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🎬 [YouTube Combined] Iniciando descarga combinada...')
     console.log('📋 [YouTube Combined] Parámetros:', { url, quality, format_type })
+    console.log('🔗 [YouTube Combined] Backend URL:', PYTHON_BACKEND_URL)
 
     // ✅ VALIDACIÓN MEJORADA DE URL
     if (!url) {
@@ -62,14 +62,14 @@ export async function POST(request: NextRequest) {
     const cleanedUrl = cleanUrl(url)
     console.log('🔧 [YouTube Combined] URL limpia:', cleanedUrl)
 
-    if (!PYTHON_API_URL) {
+    if (!PYTHON_BACKEND_URL) {
       return NextResponse.json(
         { error: 'Servidor de descargas no configurado' },
         { status: 500 }
       )
     }
 
-    // ✅ ESTRATEGIA PRINCIPAL: USAR BACKEND COMBINER
+    // ✅ ESTRATEGIA PRINCIPAL: USAR BACKEND COMBINER CON STREAMING
     console.log('🔗 [YouTube Combined] Llamando a endpoint de combinación backend...')
     
     try {
@@ -85,16 +85,16 @@ export async function POST(request: NextRequest) {
       const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minutos
 
       // ✅ ENDPOINT CORRECTO DEL BACKEND
-      const combineResponse = await fetch(`${PYTHON_API_URL}/api/v1/combiner/youtube/combine`, {
+      const combineResponse = await fetch(`${PYTHON_BACKEND_URL}/api/v1/combiner/youtube/combine`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
           url: cleanedUrl,
-          quality: quality,          // ← Para el mapeo automático
-          video_itag: itags.video,  // ← NÚMERO (backup)
-          audio_itag: itags.audio   // ← NÚMERO (backup)
+          quality: quality,
+          video_itag: itags.video,
+          audio_itag: itags.audio
         }),
         signal: controller.signal
       })
@@ -103,7 +103,12 @@ export async function POST(request: NextRequest) {
 
       if (!combineResponse.ok) {
         const errorText = await combineResponse.text()
-        console.error('❌ [YouTube Combined] Error en combinación backend:', errorText)
+        console.error('❌ [YouTube Combined] Error en combinación backend:', {
+          status: combineResponse.status,
+          statusText: combineResponse.statusText,
+          error: errorText
+        })
+        
         let errorDetail = 'Error en combinación backend'
         try {
           const errorData = JSON.parse(errorText)
@@ -111,37 +116,60 @@ export async function POST(request: NextRequest) {
         } catch {
           errorDetail = errorText
         }
-        throw new Error(errorDetail)
+        
+        // Intentar fallback a estrategia frontend
+        console.log('🔄 [YouTube Combined] Intentando estrategia frontend como fallback...')
+        return await handleFrontendCombination(cleanedUrl, quality, format_type)
       }
 
-      const combineData = await combineResponse.json()
-      console.log('✅ [YouTube Combined] Combinación backend exitosa:', {
-        status: combineData.status,
-        file_size: combineData.file_size,
-        filename: combineData.filename,
-        method: combineData.method,
-        combined: combineData.combined
+      // ✅ MANEJAR STREAMING RESPONSE DEL BACKEND
+      console.log('✅ [YouTube Combined] Backend respondió exitosamente, procesando streaming...')
+      
+      // Obtener metadatos de los headers
+      const contentDisposition = combineResponse.headers.get('Content-Disposition')
+      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] 
+        || `youtube_${quality}_${Date.now()}.mp4`
+      
+      const fileSize = combineResponse.headers.get('Content-Length')
+      const videoItag = combineResponse.headers.get('X-Video-Itag')
+      const audioItag = combineResponse.headers.get('X-Audio-Itag')
+
+      console.log('📄 [YouTube Combined] Metadatos del archivo:', {
+        filename,
+        fileSize,
+        videoItag,
+        audioItag,
+        contentType: combineResponse.headers.get('Content-Type')
       })
 
-      // ✅ VERIFICAR RESPUESTA EXITOSA
-      if (combineData.status === 'success' && combineData.file_content) {
-        console.log('✅ [YouTube Combined] Backend combinó exitosamente el archivo')
+      // ✅ CONVERTIR STREAM A BASE64
+      try {
+        const arrayBuffer = await combineResponse.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        const fileContent = buffer.toString('base64')
         
+        console.log('✅ [YouTube Combined] Archivo convertido a base64:', {
+          size: fileContent.length,
+          originalSize: buffer.length
+        })
+
         return NextResponse.json({
           status: 'success',
-          file_content: combineData.file_content, // Base64 desde backend
-          filename: combineData.filename || `youtube_${quality}_${Date.now()}.mp4`,
-          title: combineData.title || 'Video de YouTube',
-          combined: combineData.combined || true,
-          method: combineData.method || 'backend_combiner',
-          quality: combineData.quality || quality,
-          file_size: combineData.file_size,
-          video_itag: combineData.video_itag,
-          audio_itag: combineData.audio_itag,
+          file_content: fileContent,
+          filename: filename,
+          file_size: parseInt(fileSize || '0') || buffer.length,
+          title: `YouTube Video - ${quality}`,
+          combined: true,
+          method: 'backend_combiner_streaming',
+          quality: quality,
+          video_itag: videoItag ? parseInt(videoItag) : itags.video,
+          audio_itag: audioItag ? parseInt(audioItag) : itags.audio,
           message: 'Video combinado exitosamente por el backend'
         })
-      } else {
-        throw new Error('Backend no proporcionó datos de archivo combinado válidos')
+
+      } catch (streamError: any) {
+        console.error('❌ [YouTube Combined] Error procesando streaming:', streamError)
+        throw new Error(`Error procesando archivo stream: ${streamError.message}`)
       }
 
     } catch (combineError: any) {
@@ -169,7 +197,7 @@ async function handleFrontendCombination(url: string, quality: string, format_ty
     console.log('🔄 [YouTube Combined] Usando estrategia frontend...')
     
     // Obtener información del video primero
-    const infoResponse = await fetch(`${PYTHON_API_URL}/api/v1/youtube/download`, {
+    const infoResponse = await fetch(`${PYTHON_BACKEND_URL}/api/v1/youtube/download`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -378,9 +406,10 @@ export async function GET(request: NextRequest) {
     endpoint: 'POST /api/download/youtube/combined',
     parameters: {
       url: 'string (required)',
-      quality: 'string (optional) - 144p, 240p, 360p, 480p, 720p, 1080p, 1440p, 2160p',
+      quality: 'string (optional) - 144p, 240p, 360p, 480p, 720p, 1080p, 1440p, 2160p, 4k',
       format_type: 'string (optional) - mp4, webm, etc.'
     },
-    supported_qualities: ['144p', '240p', '360p', '480p', '720p', '1080p', '1440p', '2160p', '4k']
+    supported_qualities: ['144p', '240p', '360p', '480p', '720p', '1080p', '1440p', '2160p', '4k'],
+    backend_url: PYTHON_BACKEND_URL
   })
 }
