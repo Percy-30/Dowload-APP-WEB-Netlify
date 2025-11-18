@@ -1,5 +1,7 @@
-﻿import type { Metadata, Viewport } from 'next'
+﻿// app/layout.tsx
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -23,14 +25,23 @@ export const metadata: Metadata = {
   // ❌ ELIMINADO: viewport y themeColor de aquí
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={inter.className}>{children}</body>
+      <head>
+        {/* ✅ Google AdSense */}
+        <Script
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5414009811868137"
+          strategy="afterInteractive" // Se ejecuta solo en cliente
+          crossOrigin="anonymous"
+        />
+        {/* ✅ Preconnect para mejor performance */}
+        <link rel="preconnect" href="https://pagead2.googlesyndication.com" />
+        <link rel="preconnect" href="https://googleads.g.doubleclick.net" />
+      </head>
+      <body className={inter.className}>
+        {children}
+      </body>
     </html>
   )
 }

@@ -23,6 +23,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js", "hooks/useFfmpegDownloader.js","types/**/*.d.ts"],
   "exclude": ["node_modules"]
 }

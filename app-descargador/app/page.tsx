@@ -8,6 +8,7 @@ import FacebookDownloader from '@/components/platforms/FacebookDownloader'
 import YoutubeDownloader from '@/components/platforms/YoutubeDownloader'
 import TiktokDownloader from '@/components/platforms/TiktokDownloader'
 import FeaturesSection from '@/components/FeaturesSection'
+
 import SidebarAds from '@/components/Layout/SidebarAds'
 import BannerAds from '@/components/Layout/BannerAds'
 import VideoRewardsAds from '@/components/Layout/VideoRewardsAds'
@@ -44,7 +45,7 @@ export default function Home() {
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Descarga videos de Facebook, YouTube y TikTok gratis, rápido y en la mejor calidad.
           </p>
-          <BannerAds/>
+          {/*<BannerAds/> */}
         </section>     
 
         {/* Platform Tabs */}
