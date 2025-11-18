@@ -1,8 +1,10 @@
 # Node modules
 node_modules/
+app-descargador/node_modules/
 
 # Build output
 .next/
+app-descargador/.next/
 dist/
 out/
 
@@ -23,3 +25,6 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local Netlify folder
+.netlify

@@ -1,6 +1,11 @@
 [build]
-  command = "npm run build"
-  publish = ".next"
+  # Comando para construir tu Next.js
+  command = "cd app-descargador && npm install && npm run build"
+  # Carpeta a publicar (Next.js build output)
+  publish = "app-descargador/.next"
+  # Carpeta donde Netlify crea las funciones para SSR
+  functions = "app-descargador/.netlify/functions"
 
+# Plugin oficial de Next.js para Netlify
 [[plugins]]
   package = "@netlify/plugin-nextjs"
