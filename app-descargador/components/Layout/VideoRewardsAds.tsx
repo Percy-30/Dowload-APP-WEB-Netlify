@@ -1,5 +1,4 @@
-// app/components/Layout/VideoRewardsAds.tsx
-
+// app/components/Layout/VideoRewardsAds.tsx - NETLIFY
 'use client'
 
 import AdDisplay from '@/components/Ads/AdDisplay'
@@ -14,19 +13,19 @@ export default function VideoRewardsAds({ position }: VideoRewardsAdsProps) {
   return (
     <div className={`space-y-6 sticky top-24 ${position === 'left' ? 'ml-0' : 'mr-0'}`}>
 
-      {/* Banner Display vertical */}
+      {/* Banner Display vertical - NUEVO SLOT NETLIFY */}
       <div className="w-full flex justify-center">
-        <AdDisplay adSlot="4095225502" width={300} height={600} />
+        <AdDisplay adSlot="8145069585" width={300} height={600} />
       </div>
 
-      {/* Banner Multiplex */}
+      {/* Banner Multiplex - NUEVO SLOT NETLIFY */}
       <div className="w-full flex justify-center">
-        <AdMultiplex adSlot="9155980495" width={300} height={250} />
+        <AdMultiplex adSlot="4147497713" width={300} height={250} />
       </div>
 
-      {/* Banner In-Article */}
+      {/* Banner In-Article - NUEVO SLOT NETLIFY */}
       <div className="w-full max-w-sm">
-        <AdInArticle adSlot="5051701068" />
+        <AdInArticle adSlot="9171210798" />
       </div>
 
     </div>

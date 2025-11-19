@@ -36,55 +36,57 @@ export default function Home() {
       <Header />
 
       <main className="container mx-auto px-4 py-8">
-
         {/* Hero Section */}
         <section className="text-center mb-12">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-4">
-            Descarga Videos de <span className="text-blue-600">Redes Sociales</span>
+            Descarga Videos de <span className="text-blue-600">Facebook, YouTube y TikTok</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Descarga videos de Facebook, YouTube y TikTok gratis, rápido y en la mejor calidad.
+            Con FTY Downloader puedes descargar videos y audios de tus plataformas favoritas en segundos, gratis y en la mejor calidad.
           </p>
-          {/*<BannerAds/> */}
-        </section>     
+        </section>
 
         {/* Platform Tabs */}
         <section className="max-w-4xl mx-auto mb-8">
-          <PlatformTabs 
-            activePlatform={activePlatform}
-            onPlatformChange={setActivePlatform}
-          />
+          <PlatformTabs activePlatform={activePlatform} onPlatformChange={setActivePlatform} />
         </section>
 
         {/* Platform Content con Sidebars */}
         <section className="max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
-          {/* Sidebar izquierdo */}
-          <div className="hidden md:block w-64">
+          <aside className="hidden md:block w-64">
             <SidebarAds position="left" />
-          </div>
+          </aside>
 
-
-           {/* Contenido principal: descargador activo */}
           <div className="flex-1">
             {renderPlatform()}
 
-            {/* Aquí también podemos mostrar un banner o video dentro del contenido */}
             <div className="mt-8">
-              <VideoRewardsAds position='left'/>
+              <VideoRewardsAds position="left" />
             </div>
           </div>
 
-          {/* Sidebar derecho */}
-          <div className="hidden md:block w-64">
+          <aside className="hidden md:block w-64">
             <SidebarAds position="right" />
-          </div>
+          </aside>
         </section>
 
-        {/* Platform CardView */}
+        {/* Features y banners */}
         <section className="max-w-6xl mx-auto mt-12">
-          <BannerAds/>
+          <BannerAds />
           <FeaturesSection />
-          <BannerAds/>
+          <BannerAds />
+        </section>
+
+        {/* SEO-friendly tutorial */}
+        <section className="max-w-4xl mx-auto mt-12 text-gray-700">
+          <h2 className="text-2xl font-bold mb-4">Cómo descargar videos con FTY Downloader</h2>
+          <ol className="list-decimal list-inside space-y-2">
+            <li>Selecciona la plataforma: Facebook, YouTube o TikTok.</li>
+            <li>Pega la URL del video que deseas descargar.</li>
+            <li>Elige la calidad de video o audio.</li>
+            <li>Haz clic en "Descargar" y espera unos segundos.</li>
+            <li>Disfruta tu video en tu dispositivo.</li>
+          </ol>
         </section>
       </main>
 
