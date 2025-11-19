@@ -57,4 +57,26 @@
   .dark .scrollbar-thumb-gray-600 {
     scrollbar-color: #4b5563 transparent;
   }
+
+  /* ✅ NUEVAS UTILIDADES PARA SIDEBARS GLOBALES */
+  .sidebar-fixed {
+    position: fixed;
+    top: 5rem; /* Ajusta según la altura de tu header */
+    height: calc(100vh - 5rem);
+    overflow-y: auto;
+  }
+
+  /* Para que el contenido principal no quede detrás de los sidebars */
+  .main-with-sidebars {
+    margin-left: 16rem; /* 64 = w-64 */
+    margin-right: 16rem; /* 64 = w-64 */
+  }
+
+  /* Ajustes responsive */
+  @media (max-width: 1024px) {
+    .main-with-sidebars {
+      margin-left: 0;
+      margin-right: 0;
+    }
+  }
 }
